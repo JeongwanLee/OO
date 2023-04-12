@@ -1,0 +1,77 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Constants
+m = 1.0  # Mass of the particle
+hbar = 1.0  # Planck's constant (reduced)
+L = 1.0  # Width of the potential well
+V0 = 10.0  # Potential well depth
+N = 1000  # Number of grid points
+dx = L / (N - 1)  # Grid spacing
+
+# Discretize x
+x = np.linspace(0, L, N)
+
+# Define the potential function
+def V(x):
+    return V0 * (x < 0) + V0 * (x > L)
+
+# Define the Schrodinger equation as a system of first-order ODEs
+def schrodinger(x, y, E):
+    psi, phi = y
+    dpsi_dx = phi
+    dphi_dx = (2 * m / hbar**2) * (V(x) - E) * psi
+    return np.array([dpsi_dx, dphi_dx])
+
+# Numerical integration (Euler method)
+def integrate(x, y0, E):
+    y = np.zeros((2, len(x)))
+    y[:, 0] = y0
+    for i in range(len(x) - 1):
+        y[:, i + 1] = y[:, i] + dx * schrodinger(x[i], y[:, i], E)
+    return y
+
+# Bisection method to find eigenvalues
+def bisection(E_min, E_max, tol=1e-6):
+    psi_0 = np.array([0, 1])
+    while E_max - E_min > tol:
+        E = (E_min + E_max) / 2
+        psi = integrate(x, psi_0, E)[0]
+        if psi[-1] * integrate(x, psi_0, E_min)[0][-1] < 0:
+            E_max = E
+        else:
+            E_min = E
+    return E
+
+# Find eigenvalues
+eigenvalues = []
+E_min = 0
+E_max = V0
+tol = 1e-6
+
+while E_max - E_min > tol:
+    try:
+        E = bisection(E_min, E_max, tol)
+        eigenvalues.append(E)
+        E_min = E + tol
+        E_max = V0
+    except ValueError:
+        break
+
+# Calculate eigenfunctions corresponding to eigenvalues
+eigenfunctions = []
+
+for E in eigenvalues:
+    psi = integrate(x, np.array([0, 1]), E)[0]
+    psi /= np.sqrt(np.trapz(psi**2, x))  # Normalize
+    eigenfunctions.append(psi)
+
+# Plot the results
+for n, (E, psi) in enumerate(zip(eigenvalues, eigenfunctions), start=1):
+    plt.plot(x, psi + E, label=f"n={n}, E={E:.2f}")
+
+plt.plot(x, V(x), 'k--', label="V(x)")
+plt.xlabel("x")
+plt.ylabel("Energy and Wavefunction")
+plt.legend()
+plt.show()
